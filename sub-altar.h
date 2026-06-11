@@ -17,7 +17,7 @@ HAS2_Wifi has2wifi("http://172.30.1.43");
 SecureOTA ota(
   "https://raw.githubusercontent.com/Fuzzyline-HAS2/sub-altar/main/update.bin",
   "https://raw.githubusercontent.com/Fuzzyline-HAS2/sub-altar/main/version.txt",
-  "https://raw.githubusercontent.com/Fuzzyline-HAS2/sub-altar/main/update.sig",
+  "https://raw.githubusercontent.com/Fuzzyline-HAS2/sub-altar /main/update.sig",
   HMAC_SECRET,
   FIRMWARE_VER
 );
