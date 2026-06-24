@@ -82,7 +82,10 @@ int green[3]  = {0,                color_brightness, 0               };
 int purple[3] = {color_brightness, 0,                color_brightness};
 int blue[3]   = {0,                0,                color_brightness};
 
-int* current_neopixel_color = white;
+int* current_neopixel_color = purple;
+
+// NeoArrow가 그리는 화살표 색. 상태별로 바꿔서 사용 (blink=red, activate=purple)
+int* arrow_color = red;
 
 void NeopixelSet(int color[3]);
 void ApplyBrightness(int raw);

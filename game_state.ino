@@ -5,10 +5,14 @@
  */
 void SettingFunc()
 {
+    // [훈련소] 세팅 버튼을 누르면 곧바로 blink(술래 태그 대기) 상태로 시작한다.
     activate_bool = false;
-    sendCommand("page pgSetting");
+    rfid_tag = false;
+    altar_used_local = false;
+    sendCommand("page pgAltarTag");
+    // blink 상태는 모든 네오픽셀을 빨간색으로 켜두기만 한다(숨쉬기/화살표 애니메이션 없음).
     NeoFunc = NeoNo;
-    NeopixelSet(white);
+    NeopixelSet(red);
 }
 
 /**
@@ -19,7 +23,9 @@ void ReadyFunc()
 {
     activate_bool = false;
     sendCommand("page pgInfo");
-    NeoFunc = NeoBeforeTagger;
+    // ready 상태는 모든 네오픽셀을 빨간색으로 켜두기만 한다(호흡 애니메이션 없음).
+    NeoFunc = NeoNo;
+    NeopixelSet(red);
 }
 
 /**
@@ -37,6 +43,7 @@ void ActivateRunOnce()
 {
     activate_bool = true;
     altar_used_local = false;   // 라운드(activate) 진입 시 로컬 잠금 해제 → 다음 봉헌 허용
+    Serial.println("[USED] 잠금 해제 (game_state -> activate, 새 라운드)");
 }
 
 void DataChange()
@@ -84,13 +91,19 @@ void DataChange()
             // 이 복귀로 잠금이 풀리면 봉헌 후 재태그 시 생명이 다시 바쳐지는 버그 발생.
             // 라운드 시작 시 잠금 해제는 game_state→activate(ActivateRunOnce)가 담당한다.
             if ((String)(const char *)cur["device_state"] != "blink")
+            {
+                if (altar_used_local)
+                    Serial.println("[USED] 잠금 해제 (device_state -> activate, 비-blink 복귀)");
                 altar_used_local = false;
+            }
 
             // 이미 봉헌된(used) 제단은 pgUsed/빨강 고정 화면을 유지한다.
             if (!altar_used_local)
             {
                 sendCommand("page pgChipCount");
-                NeoFunc = NeoGaming;
+                // activate 상태는 모든 네오픽셀을 보라색으로 켜두기만 한다(호흡 애니메이션 없음).
+                NeoFunc = NeoNo;
+                NeopixelSet(purple);
             }
         }
         else if ((String)(const char *)my["device_state"] == "player_win")
@@ -108,7 +121,9 @@ void DataChange()
             // used(봉헌 완료) 제단은 blink 요청을 무시하고 pgUsed를 유지한다.
             if (rfid_tag || altar_used_local) return;
             sendCommand("page pgAltarTag");
-            NeoFunc = NeoTagger;
+            // blink 상태는 모든 네오픽셀을 빨간색으로 켜두기만 한다(숨쉬기/화살표 애니메이션 없음).
+            NeoFunc = NeoNo;
+            NeopixelSet(red);
         }
         else if ((String)(const char *)my["device_state"] == "github")
         {
@@ -125,9 +140,9 @@ void DataChange()
         if (!altar_used_local && !keep_tag_timer.isEnabled(keep_tag_timer_id))
             sendCommand("page pgChipCount");
     }
-    if((int)my["max_taken_chip"] != (int)cur["max_taken_chip"])
+    if((int)my["max_chip"] != (int)cur["max_chip"])
     {
-        cmd = "pgChipCount.vMaxChip.val=" + (String)(int)my["max_taken_chip"];
+        cmd = "pgChipCount.vMaxChip.val=" + (String)(int)my["max_chip"];
         sendCommand(cmd.c_str());
     }
     SyncLanguage();

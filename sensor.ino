@@ -74,7 +74,10 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
 
   // 한 번 봉헌한 제단은 잠긴다 → 이후 술래 태그는 무시(인식 안 함).
   if (altar_used_local)
+  {
+    Serial.println("[USED] 제단 잠금 상태 - 태그 무시(봉헌 안 함)");
     return;
+  }
 
   // [훈련소 하드코딩] G9P1은 술래로 고정. activate 중 첫 태그면 서버상 역할/칩 수와
   // 무관하게 생명 봉헌이 실행되도록 역할·칩 게이트를 강제로 통과시킨다.
@@ -100,6 +103,13 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
       delay(50);
     }
 
+    // pSacrificeChip(봉헌 칩 수)을 서버 polling 응답(최대 2초)을 기다리지 않고 +1 선반영한다.
+    // pgKeepTag(봉헌 화면)가 표시되고 네오픽셀 애니메이션이 끝난 뒤 값을 올려, 페이지 전환 전에 너무
+    // 일찍 튀지 않고 봉헌 화면을 보여주는 동안 자연스럽게 올라가도록 한다.
+    // 이후 서버 값이 도착해도 동일 값으로 갱신되므로 화면 변화가 없다.
+    int sacrifice_chip = (int)my["taken_chip"] + 1;
+    sendCommand(("pgChipCount.vSacrificeChip.val=" + String(sacrifice_chip)).c_str());
+
     String main_altar = (String)(const char *)my["main_altar_device_name"];
     if (main_altar.length() > 0)
         has2wifi.Send(main_altar, "taken_chip_sub", "+1");
@@ -116,6 +126,7 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
     // pgUsed 페이지 + 네오픽셀 빨간색 고정 + 애니메이션 정지로 전환한다.
     // 이후 술래 태그는 위 altar_used_local 가드에서 무시된다.
     altar_used_local = true;
+    Serial.println("[USED] 봉헌 완료 → 제단 잠금(이후 태그 무시)");
     delay(1000);
     sendCommand("page pgUsed");
     NeopixelSet(red);
@@ -205,8 +216,9 @@ void NeoBeforeTagger()
 
   breathe_direction ? breathe++ : breathe--;
 
-  pixels_mid.fill(Adafruit_NeoPixel::Color(white[0], white[1], white[2])); pixels_mid.show();
-  pixels_bot.fill(Adafruit_NeoPixel::Color(breathe, breathe, breathe));   pixels_bot.show();
+  // ready 상태는 빨간색
+  pixels_mid.fill(Adafruit_NeoPixel::Color(red[0], red[1], red[2]));    pixels_mid.show();
+  pixels_bot.fill(Adafruit_NeoPixel::Color(breathe, 0, 0));            pixels_bot.show();
   pixels_top.fill(Adafruit_NeoPixel::Color(red[0],   red[1],   red[2]));  pixels_top.show();
 
   if (breathe == 0)
@@ -227,7 +239,8 @@ void NeoTagger()
 
   breathe_direction_2 ? breathe_2++ : breathe_2--;
 
-  pixels_bot.fill(Adafruit_NeoPixel::Color(breathe_2, breathe_2, breathe_2)); pixels_bot.show();
+  // blink 상태는 빨간색으로 숨쉰다
+  pixels_bot.fill(Adafruit_NeoPixel::Color(breathe_2, 0, 0)); pixels_bot.show();
 
   if (breathe_2 == 0)
   {
@@ -239,6 +252,7 @@ void NeoTagger()
   }
 
   pixels_mid.clear();
+  arrow_color = red;   // blink 상태 화살표는 빨강
   NeoArrow();
 }
 
@@ -289,6 +303,7 @@ void NeoGaming()
 
   pixels_mid.fill(Adafruit_NeoPixel::Color(breathe, 0, breathe)); pixels_mid.show();
   pixels_bot.fill(Adafruit_NeoPixel::Color(breathe, 0, breathe)); pixels_bot.show();
+  arrow_color = purple;   // activate 상태 화살표는 보라색
   NeoArrow();
 
   if (breathe == 0)
@@ -487,38 +502,38 @@ void NeoArrowSet(int arrow_neo_line_num, int arrow_neo_line)
     pixels_top.setPixelColor(neo_num + 2, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 3, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 4, 0, 0, 0);
-    pixels_top.setPixelColor(neo_num + 5, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 5, arrow_color[0], arrow_color[1], arrow_color[2]);
     break;
   case 3:
     pixels_top.setPixelColor(neo_num + 1, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 2, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 3, 0, 0, 0);
-    pixels_top.setPixelColor(neo_num + 4, 20, 20, 20);
-    pixels_top.setPixelColor(neo_num + 5, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 4, arrow_color[0], arrow_color[1], arrow_color[2]);
+    pixels_top.setPixelColor(neo_num + 5, arrow_color[0], arrow_color[1], arrow_color[2]);
     break;
   case 6:
     pixels_top.setPixelColor(neo_num + 1, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 2, 0, 0, 0);
-    pixels_top.setPixelColor(neo_num + 3, 20, 20, 20);
-    pixels_top.setPixelColor(neo_num + 4, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 3, arrow_color[0], arrow_color[1], arrow_color[2]);
+    pixels_top.setPixelColor(neo_num + 4, arrow_color[0], arrow_color[1], arrow_color[2]);
     pixels_top.setPixelColor(neo_num + 5, 0, 0, 0);
     break;
   case 12:
     pixels_top.setPixelColor(neo_num + 1, 0, 0, 0);
-    pixels_top.setPixelColor(neo_num + 2, 20, 20, 20);
-    pixels_top.setPixelColor(neo_num + 3, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 2, arrow_color[0], arrow_color[1], arrow_color[2]);
+    pixels_top.setPixelColor(neo_num + 3, arrow_color[0], arrow_color[1], arrow_color[2]);
     pixels_top.setPixelColor(neo_num + 4, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 5, 0, 0, 0);
     break;
   case 24:
-    pixels_top.setPixelColor(neo_num + 1, 20, 20, 20);
-    pixels_top.setPixelColor(neo_num + 2, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 1, arrow_color[0], arrow_color[1], arrow_color[2]);
+    pixels_top.setPixelColor(neo_num + 2, arrow_color[0], arrow_color[1], arrow_color[2]);
     pixels_top.setPixelColor(neo_num + 3, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 4, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 5, 0, 0, 0);
     break;
   case 16:
-    pixels_top.setPixelColor(neo_num + 1, 20, 20, 20);
+    pixels_top.setPixelColor(neo_num + 1, arrow_color[0], arrow_color[1], arrow_color[2]);
     pixels_top.setPixelColor(neo_num + 2, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 3, 0, 0, 0);
     pixels_top.setPixelColor(neo_num + 4, 0, 0, 0);
