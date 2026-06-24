@@ -72,10 +72,18 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
     tagUser += (char)rfidData[i];
   Serial.println("tag_user_data : " + tagUser);
 
+  // 한 번 봉헌한 제단은 잠긴다 → 이후 술래 태그는 무시(인식 안 함).
+  if (altar_used_local)
+    return;
+
+  // [훈련소 하드코딩] G9P1은 술래로 고정. activate 중 첫 태그면 서버상 역할/칩 수와
+  // 무관하게 생명 봉헌이 실행되도록 역할·칩 게이트를 강제로 통과시킨다.
+  bool force_sacrifice = (tagUser == "G9P1");
+
   // 1. 태그한 플레이어의 역할과 생명칩갯수, 최대생명칩갯수 등 읽어오기
   has2wifi.Receive(tagUser);
 
-  if ((String)(const char *)tag["role"] == "tagger" && (int)tag["taken_chip"] > 0)
+  if (force_sacrifice || ((String)(const char *)tag["role"] == "tagger" && (int)tag["taken_chip"] > 0))
   {
     sendCommand("page pgKeepTag");
 
@@ -94,9 +102,9 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
 
     String main_altar = (String)(const char *)my["main_altar_device_name"];
     if (main_altar.length() > 0)
-        has2wifi.Send(main_altar, "taken_chip", "+1");
+        has2wifi.Send(main_altar, "taken_chip_sub", "+1");
     else
-        Serial.println("[WARN] main_altar_device_name 없음, taken_chip 전송 스킵");
+        Serial.println("[WARN] main_altar_device_name 없음, taken_chip_sub 전송 스킵");
     has2wifi.Send((String)(const char *)tag["device_name"], "taken_chip", "-1");
     has2wifi.Send((String)(const char *)tag["device_name"], "exp", "+100");
 
@@ -104,9 +112,14 @@ void CardChecking(uint8_t rfidData[32]) // 어떤 카드가 들어왔는지 확�
     pixels_bot.clear();
     pixels_top.clear();
 
-    keep_tag_timer_id = keep_tag_timer.setTimeout(2000, KeepTagTimerFunc);
-
-    NeoFunc = NeoGaming;
+    // 봉헌 완료 → 제단 사용됨으로 잠금. pgKeepTag(봉헌 화면)를 약 1초 더 보여준 뒤
+    // pgUsed 페이지 + 네오픽셀 빨간색 고정 + 애니메이션 정지로 전환한다.
+    // 이후 술래 태그는 위 altar_used_local 가드에서 무시된다.
+    altar_used_local = true;
+    delay(1000);
+    sendCommand("page pgUsed");
+    NeopixelSet(red);
+    NeoFunc = NeoNo;
   }
   //}
 }

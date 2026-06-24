@@ -24,6 +24,10 @@ SecureOTA ota(
 
 bool activate_bool;
 
+// [훈련소] 한 번 봉헌하면 즉시 "사용됨"으로 잠그는 로컬 래치.
+// true 인 동안 추가 술래 태그를 무시한다. device_state="activate" 재전환 시 해제.
+bool altar_used_local = false;
+
 void SettingFunc();
 void ReadyFunc();
 void ActionFunc();

@@ -36,6 +36,7 @@ void ActivateFunc()
 void ActivateRunOnce()
 {
     activate_bool = true;
+    altar_used_local = false;   // 라운드(activate) 진입 시 로컬 잠금 해제 → 다음 봉헌 허용
 }
 
 void DataChange()
@@ -79,8 +80,18 @@ void DataChange()
     {
         if ((String)(const char *)my["device_state"] == "activate")
         {
-            sendCommand("page pgChipCount");
-            NeoFunc = NeoGaming;
+            // 게임 중 blink(술래 유인) → activate 복귀로는 잠금을 풀지 않는다.
+            // 이 복귀로 잠금이 풀리면 봉헌 후 재태그 시 생명이 다시 바쳐지는 버그 발생.
+            // 라운드 시작 시 잠금 해제는 game_state→activate(ActivateRunOnce)가 담당한다.
+            if ((String)(const char *)cur["device_state"] != "blink")
+                altar_used_local = false;
+
+            // 이미 봉헌된(used) 제단은 pgUsed/빨강 고정 화면을 유지한다.
+            if (!altar_used_local)
+            {
+                sendCommand("page pgChipCount");
+                NeoFunc = NeoGaming;
+            }
         }
         else if ((String)(const char *)my["device_state"] == "player_win")
         {
@@ -94,7 +105,8 @@ void DataChange()
         }
         else if ((String)(const char *)my["device_state"] == "blink")
         {
-            if (rfid_tag) return;
+            // used(봉헌 완료) 제단은 blink 요청을 무시하고 pgUsed를 유지한다.
+            if (rfid_tag || altar_used_local) return;
             sendCommand("page pgAltarTag");
             NeoFunc = NeoTagger;
         }
@@ -108,8 +120,9 @@ void DataChange()
     {
         cmd = "pgChipCount.vSacrificeChip.val=" + (String)(int)my["taken_chip"];
         sendCommand(cmd.c_str());
-        // 타이머가 이미 만료된 경우(서버 응답이 2초 이후) 페이지 전환
-        if (!keep_tag_timer.isEnabled(keep_tag_timer_id))
+        // 타이머가 이미 만료된 경우(서버 응답이 2초 이후) 페이지 전환.
+        // 단, 봉헌 후 잠금(used) 상태면 pgUsed 화면을 유지해야 하므로 전환하지 않는다.
+        if (!altar_used_local && !keep_tag_timer.isEnabled(keep_tag_timer_id))
             sendCommand("page pgChipCount");
     }
     if((int)my["max_taken_chip"] != (int)cur["max_taken_chip"])
